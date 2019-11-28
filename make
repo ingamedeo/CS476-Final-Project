@@ -21,7 +21,7 @@ make_examples () {
 
 make_parser () {
     echo "Compiling OCaml IR parser..."
-    ocamlbuild  -use-ocamlfind -pkgs llvm,llvm.analysis,llvm.bitwriter,llvm.target,llvm_X86 -I src llvm_parser.byte
+    ocamlbuild  -use-ocamlfind -pkgs llvm,llvm.analysis,llvm.bitwriter,llvm.target,llvm_X86,llvm.bitreader -I src llvm_parser.byte
     echo "Done."
 }
 

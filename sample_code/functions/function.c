@@ -1,15 +1,18 @@
 #include <stdio.h>
+#include <stdlib.h>
 
-void change_value_to(int *dst, const int value){
-    *dst = value;
+__attribute__((always_inline))
+void change_value_to(float *dst){
+    *dst = rand();
 }
 
+/* __attribute__((always_inline))
+inline void change_value_to2(float *dst);
+ */
 int main(void){
 
-    int a = 3;
-    const int b = 42;
-    change_value_to(&a, b);
-
-    printf("a is now %d\n", a);
+    float a = 3.0;
+    change_value_to(&a);
+    printf("a is now %f\n", a);
 
 }

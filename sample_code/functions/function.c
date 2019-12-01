@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-__attribute__((always_inline))
+//__attribute__((always_inline))
 void change_value_to(float *dst){
     *dst = rand();
+}
+
+float *change_and_return(float *dst){
+    *dst = rand();
+    return dst;
 }
 
 /* __attribute__((always_inline))

@@ -16,10 +16,12 @@ define dso_local i32 @main() #0 {
   store i32 0, i32* %3, align 4
   br label %5
 
+5:                                                ; preds = %13, %0
   %6 = load i32, i32* %3, align 4
   %7 = icmp slt i32 %6, 16
   br i1 %7, label %8, label %16
 
+8:                                                ; preds = %5
   %9 = load i32, i32* %3, align 4
   %10 = sitofp i32 %9 to float
   %11 = load float, float* %2, align 4
@@ -27,18 +29,22 @@ define dso_local i32 @main() #0 {
   store float %12, float* %2, align 4
   br label %13
 
+13:                                               ; preds = %8
   %14 = load i32, i32* %3, align 4
   %15 = add nsw i32 %14, 1
   store i32 %15, i32* %3, align 4
   br label %5, !llvm.loop !4
 
+16:                                               ; preds = %5
   store i32 0, i32* %4, align 4
   br label %17
 
+17:                                               ; preds = %27, %16
   %18 = load i32, i32* %4, align 4
   %19 = icmp slt i32 %18, 16
   br i1 %19, label %20, label %30
 
+20:                                               ; preds = %17
   %21 = load i32, i32* %4, align 4
   %22 = load i32, i32* %4, align 4
   %23 = mul nsw i32 %21, %22
@@ -48,11 +54,13 @@ define dso_local i32 @main() #0 {
   store float %26, float* %2, align 4
   br label %27
 
+27:                                               ; preds = %20
   %28 = load i32, i32* %4, align 4
   %29 = add nsw i32 %28, 1
   store i32 %29, i32* %4, align 4
   br label %17, !llvm.loop !6
 
+30:                                               ; preds = %17
   %31 = load float, float* %2, align 4
   %32 = fpext float %31 to double
   %33 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([19 x i8], [19 x i8]* @.str, i64 0, i64 0), double %32)

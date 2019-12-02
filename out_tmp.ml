@@ -13,6 +13,7 @@ type instr = Store of arg list
 | Mul of arg list
 | Icmp of arg list
 | Br of arg list
+| Label of arg list
 | Nop
 
 type func_def = Function of ident * ident * (instr list)
@@ -92,7 +93,9 @@ let offset_instruction instr offset base usefullness_check =
     | Br i -> (
         let new_registers = offset_register i offset in 
         if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Br (new_registers)
-    )
+    ) 
+    | Label i -> Label (offset_register i offset)
+    
     | Nop -> Nop
 
 

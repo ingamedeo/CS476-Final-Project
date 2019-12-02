@@ -13,6 +13,7 @@ type instr = Store of arg list
 | Mul of arg list
 | Icmp of arg list
 | Br of arg list
+| Label of arg list
 | Nop
 
 type func_def = Function of ident * ident * (instr list)
@@ -21,7 +22,7 @@ let update fn_map id fn = fun x -> if x = id then Some fn else fn_map x
 let fun2 = Function("float*", "change_and_return", [Alloca([Reg("%2")]);Store([Reg("%0");Reg("%2")]);Call([FnName("rand");Reg("%3")]);Sitofp([Reg("%4");Reg("%3")]);Load([Reg("%5");Reg("%2")]);Store([Reg("%4");Reg("%5")]);Load([Reg("%6");Reg("%2")]);Ret([Reg("%6")])])
 let fun1 = Function("void", "change_value_to", [Alloca([Reg("%2")]);Store([Reg("%0");Reg("%2")]);Call([FnName("rand");Reg("%3")]);Sitofp([Reg("%4");Reg("%3")]);Load([Reg("%5");Reg("%2")]);Store([Reg("%4");Reg("%5")]);Ret([])])
 let main = Function("i32", "main", [Alloca([Reg("%1")]);Store([Reg("%1")]);Call([FnName("change_value_to");Reg("%1")]);Load([Reg("%2");Reg("%1")]);Fpext([Reg("%3");Reg("%2")]);Call([FnName("printf");Reg("%4");Reg("%3")]);Fpext([Reg("%3");Reg("%2")]); Fpext([Reg("%3");Reg("%2")]);Ret([])])
-
+let main_unroll = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Alloca([Reg("%4")]);Store([Reg("%1")]);Store([Reg("%2")]);Store([Reg("%3")]);Br([Reg("$5")]);Label([Reg("$5")]);Load([Reg("%6");Reg("%3")]);Icmp([Reg("%7");Reg("%6")]);Br([Reg("$7");Reg("$8");Reg("$16")]);Label([Reg("$8")]);Load([Reg("%9");Reg("%3")]);Sitofp([Reg("%10");Reg("%9")]);Load([Reg("%11");Reg("%2")]);Fadd([Reg("%12");Reg("%11");Reg("%10")]);Store([Reg("%12");Reg("%2")]);Br([Reg("$13")]);Label([Reg("$13")]);Load([Reg("%14");Reg("%3")]);Add([Reg("%15");Reg("%14")]);Store([Reg("%15");Reg("%3")]);Br([Reg("$5")]);Label([Reg("$16")]);Store([Reg("%4")]);Br([Reg("$17")]);Label([Reg("$17")]);Load([Reg("%18");Reg("%4")]);Icmp([Reg("%19");Reg("%18")]);Br([Reg("$19");Reg("$20");Reg("$30")]);Label([Reg("$20")]);Load([Reg("%21");Reg("%4")]);Load([Reg("%22");Reg("%4")]);Mul([Reg("%23");Reg("%21");Reg("%22")]);Sitofp([Reg("%24");Reg("%23")]);Load([Reg("%25");Reg("%2")]);Fadd([Reg("%26");Reg("%25");Reg("%24")]);Store([Reg("%26");Reg("%2")]);Br([Reg("$27")]);Label([Reg("$27")]);Load([Reg("%28");Reg("%4")]);Add([Reg("%29");Reg("%28")]);Store([Reg("%29");Reg("%4")]);Br([Reg("$17")]);Label([Reg("$30")]);Load([Reg("%31");Reg("%2")]);Fpext([Reg("%32");Reg("%31")]);Call([FnName("printf");Reg("%33");Reg("%32")]);Ret([])])
 
 let init_fn_map = fun x -> if x = "main" then Some main else None
 let fn_map_tmp = update init_fn_map "change_value_to" fun1
@@ -92,7 +93,9 @@ let offset_instruction instr offset base usefullness_check =
     | Br i -> (
         let new_registers = offset_register i offset in 
         if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Br (new_registers)
-    )
+    ) 
+    | Label i -> Label (offset_register i offset)
+    
     | Nop -> Nop
 
 
@@ -181,6 +184,29 @@ let rec add_conditional_return body =
     )
     | [] -> body
 
+let update_table table label block = fun x -> if x = label then block else table x 
+
+let rec update_all table block = 
+    match block with 
+    | hd::tl -> (
+        match hd with 
+        | Label (i::unreachable) -> (
+            match i with 
+            | Reg ii -> update_all (update_table table ii tl) tl
+            | _ -> None
+        )
+        | _ -> None
+    )
+    | [] -> Some (table)
+
+
+let rec create_label_table block = 
+    let empty_table = fun x -> [] in 
+    update_all empty_table block
+
+ let rec unroll block size orig_size =
+    if size > 0 then rename_registers block (orig_size - size) 0 @ unroll block (size - 1) orig_size else []
+
 let inlined = 
     match main with
     | Function (fn_type, name, body) -> (
@@ -193,6 +219,13 @@ let inlined =
         | Function (_, _, new_body) -> Function (fn_type, name, add_conditional_return(remove_nops new_body))
 
         
+    )
+
+let unrolled = 
+    match main_unroll with 
+    | Function (fn_type, name, body) -> (
+        let label_table = create_label_table body in 
+        label_table
     )
 
 (*  #use "out_tmp.ml";; *)

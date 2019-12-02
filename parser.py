@@ -12,8 +12,6 @@ regex_fun = re.compile("define dso_local (.*) @(.*)\((.*)\) (.*) (.*)")
 def parse_instr_into_ast(line):
 
     registers = []
-    func_name = ""
-    instr_body = ""
 
     instr_regex = re.compile("(.*) = (.*)")
     registers_regex = re.compile("%[0-9]+")
@@ -73,6 +71,16 @@ if __name__ == "__main__":
             instr_list = []
             for line in body:
                 name, registers = parse_instr_into_ast(line)
+                # reorder registers to make FnName(..) first
+
+                if name == "call":
+                    name_idx = -1
+                    for idx, reg in enumerate(registers):
+                        if "FnName" in reg:
+                            name_idx = idx
+                    new_registers = [registers[name_idx]]
+                    new_registers.extend([rx for rx in registers if rx != registers[name_idx]])
+                    registers = new_registers.copy()
                 out = ""
                 out += f"{name.capitalize()}("
                 out += "["

@@ -8,6 +8,11 @@ type instr = Store of arg list
 | Alloca of arg list 
 | Load of arg list 
 | Fpext of arg list
+| Fadd of arg list
+| Add of arg list
+| Mul of arg list
+| Icmp of arg list
+| Br of arg list
 | Nop
 
 type func_def = Function of ident * ident * (instr list)
@@ -68,15 +73,42 @@ let offset_instruction instr offset base usefullness_check =
         let new_registers = offset_register i offset in 
         if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Fpext (new_registers)
     ) 
+    | Fadd i -> (
+        let new_registers = offset_register i offset in 
+        if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Fadd (new_registers)
+    )    
+    | Add i -> (
+        let new_registers = offset_register i offset in 
+        if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Add (new_registers)
+    )    
+    | Mul i -> (
+        let new_registers = offset_register i offset in 
+        if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Mul (new_registers)
+    )
+    | Icmp i -> (
+        let new_registers = offset_register i offset in 
+        if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Icmp (new_registers)
+    )
+    | Br i -> (
+        let new_registers = offset_register i offset in 
+        if has_useless_registers new_registers base = true && usefullness_check = true then Nop else Br (new_registers)
+    )
     | Nop -> Nop
+
+
 
 let get_first_register_from_instruction instr = 
     match instr with 
     | Store (i)
+    | Fadd (i)
     | Sitofp (i) 
+    | Add (i)
     | Call (i) 
+    | Mul (i)
     | Ret (i) 
+    | Icmp (i)
     | Alloca (i)
+    | Br (i)
     | Load (i)
     | Fpext (i) -> (
         match i with 
@@ -94,20 +126,6 @@ let rec rename_registers fn_body offset base =
     match fn_body with 
     | hd::tail -> offset_instruction hd offset base true:: rename_registers tail offset base
     | [] -> []
-
-(* let rec inline_fn_body body fn_map =
-    match body with 
-    | hd::tl -> (
-        match hd with 
-        | FnName fname -> (
-            Printf.printf "name %s\n" fname;
-            match fn_map fname with 
-            | Some (Function (ret, name, body)) -> rename_registers body 2
-            | None -> []
-        )
-        | Reg reg -> inline_fn_body tl fn_map
-    )
-    | [] -> [] *)
 
 let rec find_first_register_addr block = 
     match block with 

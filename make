@@ -14,6 +14,8 @@ make_examples () {
         for f in `find ${source_dir} -type f -name "*.c"`
         do
             clang -c $1 -emit-llvm $f
+	    #TODO: Pass correct flag to clang to disable instering optnone which breaks mem2reg
+	    #TODO: call llvm-dis to disassemble .bc
         done
         echo "[${source_dir}] Done."
     done

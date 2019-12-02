@@ -6,7 +6,7 @@ int main(void){
     float acc = 0.0;
 
     #pragma unroll
-    for(int i = 0; i < SIZE; ++i){
+    for(int i = 0; i < 10; ++i){
         acc += i * i;
     }
 

@@ -111,7 +111,7 @@ let rec enable_mem2reg body fn_map offset rm_map label_block =
 	)
     | [] -> []
 
-Printf.printf "Starting mem2reg LLVM optimization. Nananana..\n"
+(* LLVM mem2reg optimization entry point *)
 let ssa_enabled =
         match main with
         | Function (fn_type, name, body) -> (

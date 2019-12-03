@@ -15,6 +15,7 @@ type instr = Store of arg list
 | Icmp of arg list
 | Br of arg list
 | Label of arg list
+| Phi of arg list
 | Nop
 
 type func_def = Function of ident * ident * (instr list)
@@ -23,8 +24,9 @@ let main = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Allo
 
 let init_fn_map = fun x -> if x == "main" then Some main else None
 
-(* list of removed registers *)
-let rm_list = []
+(* map of removed registers *)
+let empty_rm_map = fun x -> None
+let update_rm rm_map reg = fun x -> if x = reg then Some reg else rm_map x
 
 (* 
 1) Look for Alloca calls DONE
@@ -33,6 +35,8 @@ let rm_list = []
 4) Delete Alloca DONE (Alloca is turned into Nop instruction)
 5) Substitute load with phi node
 When you find a load instr -> Look for store instr with that reg as src. -> If multiple we need to get blocks and build phi node
+I AM HERE ;)
+-> now build phi node
 6) Delete Load, Store(s)
 
  *)
@@ -58,11 +62,26 @@ let rec is_upgradable body reg fn_map =
         )
     | [] -> true
 
+let rec look_for_stores body reg label_block fn_map =
+    match body with
+    | hd::tail -> (
+        match hd with
+        | Store params -> Printf.printf "found store with reg %s in label block %s\n" reg label_block; look_for_stores tail reg label_block fn_map
+	| Label params -> (
+			  let jmp_lbl_c = List.nth params 0 in
+			  match jmp_lbl_c with
+			  | Reg jmp_lbl -> look_for_stores tail reg jmp_lbl fn_map
+			  | _ -> look_for_stores tail reg label_block fn_map (* This can't happen *)
+			)
+        | other -> look_for_stores tail reg label_block fn_map
+        )
+    | [] -> []
+
 (* Delete all store calls that reference to that reg
 Look for load calls -> when found one, delete all and substitute with phi nodes for all substituted regs.
  *)
 
-let rec enable_mem2reg body fn_map offset rm_list =
+let rec enable_mem2reg body fn_map offset rm_map label_block =
     match body with
     | hd::tail -> (
 	match hd with
@@ -70,22 +89,31 @@ let rec enable_mem2reg body fn_map offset rm_list =
 		let nly_reg_c = List.nth params 0 in
 		match nly_reg_c with 
 		| Reg nly_reg -> if is_upgradable tail nly_reg fn_map then (
-				Nop::enable_mem2reg tail fn_map offset (nly_reg::rm_list)
+				Nop::enable_mem2reg tail fn_map offset (update_rm rm_map nly_reg) label_block
 				(*Delete all store calls that reference to that reg and substitute load calls with phi*)
-				) else Alloca(params)::enable_mem2reg tail fn_map offset rm_list
+				) else Alloca(params)::enable_mem2reg tail fn_map offset rm_map label_block
 		)
 	| Load params -> (
 		let src_reg_c = List.nth params 1 in (* Loads have two params, the first is the dest, the second is the source reg *)
 		match src_reg_c with
-		| Reg src_reg -> //Check if in rm_list if it's in there, we have removed that reg
+		| Reg src_reg -> (
+			match rm_map src_reg with
+			| Some reg -> (
+				(* NOTE: Don't do anything for now. look_for_stores should be able to look for stores in the FULL body. Not only the tail. *)
+				let interm_ast = look_for_stores body reg label_block fn_map in
+					Printf.printf "found prev. rm reg %s\n" reg;
+					Nop::enable_mem2reg tail fn_map offset rm_map label_block
+			)
+			| None -> Printf.printf "reg %s is still there\n" src_reg;Load(params)::enable_mem2reg tail fn_map offset rm_map label_block
+			)
 		)
-	| other -> other::enable_mem2reg tail fn_map offset rm_list
+	| other -> other::enable_mem2reg tail fn_map offset rm_map label_block
 	)
     | [] -> []
 
 let ssa_enabled =
         match main with
         | Function (fn_type, name, body) -> (
-	   Function (fn_type, name, enable_mem2reg body init_fn_map 0 rm_list)
+	   Function (fn_type, name, enable_mem2reg body init_fn_map 0 empty_rm_map "%0")
 	)
 

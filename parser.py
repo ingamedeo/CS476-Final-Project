@@ -1,10 +1,14 @@
+#
+# This parser supports LLVM version 9.0.1 (llvm-dis-9)
+#
+
 import re
 import sys
 
 input_file = sys.argv[1]
 
 # regex_fun = "define dso_local ([.]+[*]*) @([.]+) \([.]+[*]*\)"
-regex_fun = re.compile("define (.*) @(.*)\((.*)\) (.*) (.*)")
+regex_fun = re.compile("define dso_local (.*) @(.*)\((.*)\) (.*) (.*)")
 
 
 # constructors = ["alloca", "call", "load", "store", "sitofp", "fptext"]
@@ -58,7 +62,7 @@ if __name__ == "__main__":
 
         for idx, line in enumerate(file):
 
-            if "define" in line:
+            if "define dso_local" in line:
                 func_begin_idx = idx
                 func = re.match(regex_fun, line)
                 func_type, func_name, func_args, identifier, parenthesis = func.groups()
@@ -82,8 +86,8 @@ if __name__ == "__main__":
             instr_list = []
             for line in body:
 
-		#Skip comments
-                if line.startswith(';;'):
+		#Skip IR annotations
+                if line.startswith('; '):
                     continue
 
                 name, registers = parse_instr_into_ast(line)

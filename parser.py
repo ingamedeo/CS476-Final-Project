@@ -20,7 +20,7 @@ def parse_instr_into_ast(line):
 
     if ":" in line:
         # label
-        return "label", [f"\"${line.split(':')[0]}\""]
+        return "label", [f"Reg(\"${line.split(':')[0]}\")"]
 
     if result is not None:
         dest, instr_body = result.groups()

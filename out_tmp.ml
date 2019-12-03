@@ -175,7 +175,7 @@ let rec remove_nops body =
     | i::rest -> i::remove_nops rest
     | [] -> []
 
-let rec add_conditional_return body = 
+let add_conditional_return body = 
     match List.rev body with 
     | hd::rest -> (
         match hd with 
@@ -224,8 +224,7 @@ let inlined =
 let unrolled = 
     match main_unroll with 
     | Function (fn_type, name, body) -> (
-        let label_table = create_label_table body in 
-        label_table
+        Function (fn_type, name, unroll body 10 10)
     )
 
 (*  #use "out_tmp.ml";; *)

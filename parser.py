@@ -30,6 +30,10 @@ def parse_instr_into_ast(line):
 
     func_name = instr_body.split(" ")[0]
     instr_registers = re.findall(registers_regex, instr_body)
+    if func_name == "icmp":
+        value = instr_body.split(" ")[-1]
+        if "%" not in value:
+            registers.append(f"Reg(\"{value}\")")
 
     if func_name == "call":
         callee = re.match(fn_call_regex, instr_body)
@@ -88,6 +92,17 @@ if __name__ == "__main__":
                     new_registers = [registers[name_idx]]
                     new_registers.extend([rx for rx in registers if rx != registers[name_idx]])
                     registers = new_registers.copy()
+
+                if name == "icmp":
+                    name_idx = -1
+                    for idx, reg in enumerate(registers):
+                        if "%" not in reg:
+                            name_idx = idx
+                    if name_idx != -1:
+                        new_registers = [registers[name_idx]]
+                        new_registers.extend([rx for rx in registers if rx != registers[name_idx]])
+                        registers = new_registers.copy()
+
                 out = ""
                 out += f"{name.capitalize()}("
                 out += "["

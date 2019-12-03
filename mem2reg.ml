@@ -28,6 +28,21 @@ let init_fn_map = fun x -> if x == "main" then Some main else None
 let empty_rm_map = fun x -> None
 let update_rm rm_map reg = fun x -> if x = reg then Some reg else rm_map x
 
+(*
+So now we have to create the phi node, phi nodes have the following structure.
+
+Let's say we are in label block 4
+  ;If we arrived from block %0 (main) then it's 0, otherwise if we arrive from block %11, it's %12.
+  %.01 = phi i32 [ 0, %0 ], [ %12, %11 ]
+
+Here we don't represent values, so they should be something like: Phi(?, "%0", %12", "%11")
+We take values from store calls. They are AFTER the assign. instr. e.g. %19 = add nsw i32 %18, 1 and then we see a store like: store i32 %19, i32* %2, align 4
+We can derive a part of node phi... phi XX [?,?] [%19, %label_block where we found the store]
+
+We should do so for all removed regs... when we can't find any more stores -> We put phi nodes in the place of the Load ;))
+
+*)
+
 (* 
 1) Look for Alloca calls DONE
 2) Check that register doesn't appear as operand of any Call() DONE
@@ -38,7 +53,8 @@ When you find a load instr -> Look for store instr with that reg as src. -> If m
 I AM HERE ;)
 -> now build phi node
 6) Delete Load, Store(s)
-
+7) Rename registers like Francesco did. (But only as final step, otherwise we lose refs for building phi nodes!!)
+8) Should we also remove useless regs. Like there's a %1 reg at the beginning of the program. No idea.
  *)
 
 (*

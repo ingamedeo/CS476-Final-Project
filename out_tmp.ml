@@ -22,8 +22,7 @@ let update fn_map id fn = fun x -> if x = id then Some fn else fn_map x
 let fun2 = Function("float*", "change_and_return", [Alloca([Reg("%2")]);Store([Reg("%0");Reg("%2")]);Call([FnName("rand");Reg("%3")]);Sitofp([Reg("%4");Reg("%3")]);Load([Reg("%5");Reg("%2")]);Store([Reg("%4");Reg("%5")]);Load([Reg("%6");Reg("%2")]);Ret([Reg("%6")])])
 let fun1 = Function("void", "change_value_to", [Alloca([Reg("%2")]);Store([Reg("%0");Reg("%2")]);Call([FnName("rand");Reg("%3")]);Sitofp([Reg("%4");Reg("%3")]);Load([Reg("%5");Reg("%2")]);Store([Reg("%4");Reg("%5")]);Ret([])])
 let main = Function("i32", "main", [Alloca([Reg("%1")]);Store([Reg("%1")]);Call([FnName("change_value_to");Reg("%1")]);Load([Reg("%2");Reg("%1")]);Fpext([Reg("%3");Reg("%2")]);Call([FnName("printf");Reg("%4");Reg("%3")]);Fpext([Reg("%3");Reg("%2")]); Fpext([Reg("%3");Reg("%2")]);Ret([])])
-let main_unroll = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Alloca([Reg("%4")]);Store([Reg("%1")]);Store([Reg("%2")]);Store([Reg("%3")]);Br([Reg("$5")]);Label([Reg("$5")]);Load([Reg("%6");Reg("%3")]);Icmp([Reg("%7");Reg("%6")]);Br([Reg("$7");Reg("$8");Reg("$16")]);Label([Reg("$8")]);Load([Reg("%9");Reg("%3")]);Sitofp([Reg("%10");Reg("%9")]);Load([Reg("%11");Reg("%2")]);Fadd([Reg("%12");Reg("%11");Reg("%10")]);Store([Reg("%12");Reg("%2")]);Br([Reg("$13")]);Label([Reg("$13")]);Load([Reg("%14");Reg("%3")]);Add([Reg("%15");Reg("%14")]);Store([Reg("%15");Reg("%3")]);Br([Reg("$5")]);Label([Reg("$16")]);Store([Reg("%4")]);Br([Reg("$17")]);Label([Reg("$17")]);Load([Reg("%18");Reg("%4")]);Icmp([Reg("%19");Reg("%18")]);Br([Reg("$19");Reg("$20");Reg("$30")]);Label([Reg("$20")]);Load([Reg("%21");Reg("%4")]);Load([Reg("%22");Reg("%4")]);Mul([Reg("%23");Reg("%21");Reg("%22")]);Sitofp([Reg("%24");Reg("%23")]);Load([Reg("%25");Reg("%2")]);Fadd([Reg("%26");Reg("%25");Reg("%24")]);Store([Reg("%26");Reg("%2")]);Br([Reg("$27")]);Label([Reg("$27")]);Load([Reg("%28");Reg("%4")]);Add([Reg("%29");Reg("%28")]);Store([Reg("%29");Reg("%4")]);Br([Reg("$17")]);Label([Reg("$30")]);Load([Reg("%31");Reg("%2")]);Fpext([Reg("%32");Reg("%31")]);Call([FnName("printf");Reg("%33");Reg("%32")]);Ret([])])
-
+let main_unroll = Function("dso_local i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Store([Reg("%1")]);Store([Reg("%2")]);Store([Reg("%3")]);Br([Reg("$4")]);Label([Reg("$4")]);Load([Reg("%5");Reg("%3")]);Icmp([Reg("10");Reg("%6");Reg("%5")]);Br([Reg("$6");Reg("$7");Reg("$17")]);Label([Reg("$7")]);Load([Reg("%8");Reg("%3")]);Load([Reg("%9");Reg("%3")]);Mul([Reg("%10");Reg("%8");Reg("%9")]);Sitofp([Reg("%11");Reg("%10")]);Load([Reg("%12");Reg("%2")]);Fadd([Reg("%13");Reg("%12");Reg("%11")]);Store([Reg("%13");Reg("%2")]);Br([Reg("$14")]);Label([Reg("$14")]);Load([Reg("%15");Reg("%3")]);Add([Reg("%16");Reg("%15")]);Store([Reg("%16");Reg("%3")]);Br([Reg("$4")]);Label([Reg("$17")]);Load([Reg("%18");Reg("%2")]);Fpext([Reg("%19");Reg("%18")]);Call([FnName("printf");Reg("%20");Reg("%19")]);Ret([])])
 let init_fn_map = fun x -> if x = "main" then Some main else None
 let fn_map_tmp = update init_fn_map "change_value_to" fun1
 let fn_map = update fn_map_tmp "change_and_return" fun2
@@ -32,7 +31,10 @@ let rec offset_register reglist offset =
     match reglist with 
     | hd::tail -> (
         match hd with 
-        | Reg p -> Reg ("%"^string_of_int(int_of_string (String.sub p 1 ((String.length p) - 1)) + offset))::offset_register tail offset
+        | Reg p -> (
+            if String.contains p '%' then  Reg ("%"^string_of_int(int_of_string (String.sub p 1 ((String.length p) - 1)) + offset))::offset_register tail offset else Reg (p)::offset_register tail offset 
+        )
+        
         | _ -> hd::offset_register tail offset
     )
     | [] -> []
@@ -184,28 +186,59 @@ let add_conditional_return body =
     )
     | [] -> body
 
-let update_table table label block = fun x -> if x = label then block else table x 
+let rec unroll block size orig_size =
+    if size > 0 then rename_registers block (orig_size - size) 0 @ unroll block (size - 1) orig_size else []
 
-let rec update_all table block = 
-    match block with 
+let rec find_register_pointing_to_label registers label: arg option = 
+    match registers with 
     | hd::tl -> (
         match hd with 
-        | Label (i::unreachable) -> (
-            match i with 
-            | Reg ii -> update_all (update_table table ii tl) tl
-            | _ -> None
-        )
-        | _ -> None
+        | Reg i -> if i = label then Some (Reg i) else find_register_pointing_to_label tl label
+        | _ -> find_register_pointing_to_label tl label
     )
-    | [] -> Some (table)
+    | [] -> None
 
+let rec find_until_branch_pointing_to_label label instrs accumulator: (instr list) = 
+    match instrs with 
+    | hd::tl -> (
+        match hd with 
+        | Br reg -> (
+            match  find_register_pointing_to_label reg label with 
+            | Some reg -> accumulator
+            | None -> find_until_branch_pointing_to_label label tl accumulator@[hd]
+        )
+        | _ -> find_until_branch_pointing_to_label label tl accumulator@[hd]
+    )
+    | [] -> accumulator
 
-let rec create_label_table block = 
-    let empty_table = fun x -> [] in 
-    update_all empty_table block
+let rec find_first_label (body: instr list) (label_table: ident -> (instr list) option): (ident -> (instr list) option) = 
+    match body with 
+    | hd::tl -> (
+        match hd with 
+        | Label label-> (
+            match List.hd label with 
+            | Reg label -> (
+                let instrs = find_until_branch_pointing_to_label label tl [] in
+                    if instrs = [] then find_first_label tl label_table else find_first_label tl (update label_table label instrs)
+            )
+            | FnName unused -> (fun x -> None)
+        )
+        | _ -> find_first_label tl label_table
+    )
+    | [] -> label_table
 
- let rec unroll block size orig_size =
-    if size > 0 then rename_registers block (orig_size - size) 0 @ unroll block (size - 1) orig_size else []
+let rec find_unroll_factor instrs = 
+    match instrs with 
+    | hd::tl -> (
+        match hd with 
+        | Icmp args -> (
+            match List.hd args with 
+            | Reg reg -> int_of_string reg
+            | FnName _ -> -999
+        )
+        | _ -> find_unroll_factor tl
+    )
+    | [] -> -999
 
 let inlined = 
     match main with
@@ -217,14 +250,51 @@ let inlined =
         (* second pass, registers after the function call by the given offset *)
         match pass1 with 
         | Function (_, _, new_body) -> Function (fn_type, name, add_conditional_return(remove_nops new_body))
-
-        
     )
+
+let empty_label_table = fun x -> None
+
+let rec inject_at_branch_label whole_func to_inject label base = 
+    match whole_func with 
+    | hd::tl -> (
+        match hd with 
+        | Br args -> (
+            match List.hd args with 
+            | Reg reg -> if reg = label then to_inject@rename_registers tl ((List.length to_inject) * base)  0 else hd::inject_at_branch_label tl to_inject label base
+            | FnName n -> []
+        )
+        | _ -> hd::inject_at_branch_label tl to_inject label base
+    )
+    | [] -> []
+
+let rec remove_icmp fn_body = 
+    match fn_body with 
+    |hd::tl -> (
+        match hd with 
+        | Icmp _ -> remove_icmp tl
+        |_ -> hd::remove_icmp tl
+    )
+    |[] -> []
 
 let unrolled = 
     match main_unroll with 
     | Function (fn_type, name, body) -> (
-        Function (fn_type, name, unroll body 10 10)
+        let label_table = find_first_label body empty_label_table in 
+        let loop_to_unroll = "$4" in 
+        match label_table loop_to_unroll with 
+        | Some instrs -> (
+            let unroll_factor = find_unroll_factor (List.rev instrs) in 
+            if unroll_factor <> -999 then (
+                let unrolled_body = unroll (List.rev (instrs)) (unroll_factor - 1) unroll_factor in 
+                let cleaned = remove_icmp unrolled_body in 
+                Function (fn_type, name, inject_at_branch_label body cleaned loop_to_unroll unroll_factor)
+            )
+            else (
+                raise (Failure "Illegal state -> couldn't unroll")
+            )
+        )
+        | None -> Function(fn_type, name, [])
     )
 
 (*  #use "out_tmp.ml";; *)
+(* Function (fn_type, name, unroll body 10 10) *)

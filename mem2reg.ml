@@ -19,7 +19,7 @@ type instr = Store of arg list
 
 type func_def = Function of ident * ident * (instr list)
 let update fn_map id fn = fun x -> if x == id then Some fn else fn_map id
-let main = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Alloca([Reg("%4")]);Store([Reg("%1")]);Store([Reg("%3")]);Store([Reg("%4")]);Call([FnName("printf");Reg("%5")]);Call([FnName("__isoc99_scanf");Reg("%6");Reg("%3")]);Load([Reg("%7");Reg("%4")]);Fadd([Reg("%8");Reg("%7")]);Store([Reg("%8");Reg("%4")]);Load([Reg("%9");Reg("%4")]);Fpext([Reg("%10");Reg("%9")]);Call([FnName("printf");Reg("%11");Reg("%10")]);Load([Reg("%12");Reg("%4")]);Fadd([Reg("%13");Reg("%12")]);Store([Reg("%13");Reg("%4")]);Load([Reg("%14");Reg("%4")]);Fpext([Reg("%15");Reg("%14")]);Call([FnName("printf");Reg("%16");Reg("%15")]);Ret([])])
+let main = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Alloca([Reg("%4")]);Store([Reg("%1")]);Store([Reg("%3")]);Store([Reg("%4")]);Call([FnName("printf");Reg("%5")]);Call([FnName("__isoc99_scanf");Reg("%6");Reg("%3")]);Store([Reg("%2")]);Br([Reg("$7")]);Label([Reg("$7")]);Load([Reg("%8");Reg("%2")]);Load([Reg("%9");Reg("%3")]);Icmp([Reg("%10");Reg("%8");Reg("%9")]);Br([Reg("$10");Reg("$11");Reg("$20")]);Label([Reg("$11")]);Load([Reg("%12");Reg("%4")]);Fadd([Reg("%13");Reg("%12")]);Store([Reg("%13");Reg("%4")]);Load([Reg("%14");Reg("%4")]);Fpext([Reg("%15");Reg("%14")]);Call([FnName("printf");Reg("%16");Reg("%15")]);Br([Reg("$17")]);Label([Reg("$17")]);Load([Reg("%18");Reg("%2")]);Add([Reg("%19");Reg("%18")]);Store([Reg("%19");Reg("%2")]);Br([Reg("$7")]);Label([Reg("$20")]);Ret([])])
 
 let init_fn_map = fun x -> if x == "main" then Some main else None
 
@@ -31,14 +31,15 @@ let rm_list = []
 2) Check that register doesn't appear as operand of any Call() DONE
 3) If so -> eligible for promotion ;) DONE
 4) Delete Alloca DONE (Alloca is turned into Nop instruction)
-5) Delete Store
-5) Look for load calls to that register and substitute with phi node. (..)
+5) Substitute load with phi node
+When you find a load instr -> Look for store instr with that reg as src. -> If multiple we need to get blocks and build phi node
+6) Delete Load, Store(s)
+
  *)
 
 (*
 Check if reg appears as operand of a Call() instr. If so, it's not eligible to be upgraded ;(
 *)
-
 let rec scan_reg_upgradable regs reg fn_map =
     match regs with
                 | hdr::tailr -> (
@@ -72,6 +73,11 @@ let rec enable_mem2reg body fn_map offset rm_list =
 				Nop::enable_mem2reg tail fn_map offset (nly_reg::rm_list)
 				(*Delete all store calls that reference to that reg and substitute load calls with phi*)
 				) else Alloca(params)::enable_mem2reg tail fn_map offset rm_list
+		)
+	| Load params -> (
+		let src_reg_c = List.nth params 1 in (* Loads have two params, the first is the dest, the second is the source reg *)
+		match src_reg_c with
+		| Reg src_reg -> //Check if in rm_list if it's in there, we have removed that reg
 		)
 	| other -> other::enable_mem2reg tail fn_map offset rm_list
 	)

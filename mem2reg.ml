@@ -23,6 +23,9 @@ let main = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Allo
 
 let init_fn_map = fun x -> if x == "main" then Some main else None
 
+(* list of removed registers *)
+let rm_list = []
+
 (* 
 1) Look for Alloca calls DONE
 2) Check that register doesn't appear as operand of any Call() DONE
@@ -33,7 +36,7 @@ let init_fn_map = fun x -> if x == "main" then Some main else None
  *)
 
 (*
-Check if reg is upgradable.
+Check if reg appears as operand of a Call() instr. If so, it's not eligible to be upgraded ;(
 *)
 
 let rec scan_reg_upgradable regs reg fn_map =
@@ -54,23 +57,29 @@ let rec is_upgradable body reg fn_map =
         )
     | [] -> true
 
-let rec inline_declared_fn_calls body fn_map offset =
+(* Delete all store calls that reference to that reg
+Look for load calls -> when found one, delete all and substitute with phi nodes for all substituted regs.
+ *)
+
+let rec enable_mem2reg body fn_map offset rm_list =
     match body with
     | hd::tail -> (
 	match hd with
 	| Alloca params -> (
 		let nly_reg_c = List.nth params 0 in
 		match nly_reg_c with 
-		| Reg nly_reg -> if is_upgradable tail nly_reg fn_map then Nop::inline_declared_fn_calls tail fn_map offset else Alloca(params)::inline_declared_fn_calls tail fn_map offset
+		| Reg nly_reg -> if is_upgradable tail nly_reg fn_map then (
+				Nop::enable_mem2reg tail fn_map offset (nly_reg::rm_list)
+				(*Delete all store calls that reference to that reg and substitute load calls with phi*)
+				) else Alloca(params)::enable_mem2reg tail fn_map offset rm_list
 		)
-	| other -> other::inline_declared_fn_calls tail fn_map offset 
+	| other -> other::enable_mem2reg tail fn_map offset rm_list
 	)
     | [] -> []
 
 let ssa_enabled =
         match main with
         | Function (fn_type, name, body) -> (
-	   Function (fn_type, name, inline_declared_fn_calls body init_fn_map 0)
+	   Function (fn_type, name, enable_mem2reg body init_fn_map 0 rm_list)
 	)
-
 

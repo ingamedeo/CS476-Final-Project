@@ -81,6 +81,11 @@ if __name__ == "__main__":
             body = func_list[func_name]["body"]
             instr_list = []
             for line in body:
+
+		#Skip comments
+                if line.startswith(';;'):
+                    continue
+
                 name, registers = parse_instr_into_ast(line)
                 # reorder registers to make FnName(..) first
 

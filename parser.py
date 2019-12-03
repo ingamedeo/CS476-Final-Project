@@ -4,7 +4,7 @@ import sys
 input_file = sys.argv[1]
 
 # regex_fun = "define dso_local ([.]+[*]*) @([.]+) \([.]+[*]*\)"
-regex_fun = re.compile("define dso_local (.*) @(.*)\((.*)\) (.*) (.*)")
+regex_fun = re.compile("define (.*) @(.*)\((.*)\) (.*) (.*)")
 
 
 # constructors = ["alloca", "call", "load", "store", "sitofp", "fptext"]
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
         for idx, line in enumerate(file):
 
-            if "define dso_local" in line:
+            if "define" in line:
                 func_begin_idx = idx
                 func = re.match(regex_fun, line)
                 func_type, func_name, func_args, identifier, parenthesis = func.groups()

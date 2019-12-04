@@ -37,7 +37,8 @@ inline:
 	echo "Generating OPT LLVM IR.."
 	$(CLANG) -c -O0 -emit-llvm $(SAMPLE_PATH)/inline/inline-enabled.c -o $(SAMPLE_PATH)/inline/inline-enabled.bc -Xclang -disable-O0-optnone
 	echo "Disassembling LLVM IR.."
-	$(LLVMDIS) $(SAMPLE_PATH)/inline/inline-enabled.bc -o=$(SAMPLE_PATH)/inline/inline-enabled.ll
+	$(LLVMDIS) $(SAMPLE_PATH)/inline/inline-enabled.bc -o=$(SAMPLE_PATH)/inline/inline-pragma.ll
+	$(OPT) -always-inline -S $(SAMPLE_PATH)/inline/inline-pragma.ll -o $(SAMPLE_PATH)/inline/inline-enabled.ll
 	$(PYTHON) parser.py $(SAMPLE_PATH)/inline/inline.ll
 
 clean:

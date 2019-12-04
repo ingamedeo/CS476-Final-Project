@@ -1,6 +1,6 @@
 open List 
 type ident = string
-type arg = Reg of ident | FnName of ident 
+type arg = Op of ident | FnName of ident
 
 type instr = Store of arg list 
 | Sitofp of arg list 
@@ -20,8 +20,8 @@ type instr = Store of arg list
 
 type func_def = Function of ident * ident * (instr list)
 let update fn_map id fn = fun x -> if x == id then Some fn else fn_map id
-(* let main = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Alloca([Reg("%4")]);Store([Reg("%1")]);Store([Reg("%3")]);Store([Reg("%4")]);Call([FnName("printf");Reg("%5")]);Call([FnName("__isoc99_scanf");Reg("%6");Reg("%3")]);Store([Reg("%2")]);Br([Reg("$7")]);Label([Reg("$7")]);Load([Reg("%8");Reg("%2")]);Load([Reg("%9");Reg("%3")]);Icmp([Reg("%10");Reg("%8");Reg("%9")]);Br([Reg("$10");Reg("$11");Reg("$20")]);Label([Reg("$11")]);Load([Reg("%12");Reg("%4")]);Fadd([Reg("%13");Reg("%12")]);Store([Reg("%13");Reg("%4")]);Load([Reg("%14");Reg("%4")]);Fpext([Reg("%15");Reg("%14")]);Call([FnName("printf");Reg("%16");Reg("%15")]);Br([Reg("$17")]);Label([Reg("$17")]);Load([Reg("%18");Reg("%2")]);Add([Reg("%19");Reg("%18")]);Store([Reg("%19");Reg("%2")]);Br([Reg("$7")]);Label([Reg("$20")]);Ret([])]) *)
-let main = Function("i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Alloca([Reg("%4")]);Store([Reg("0");Reg("%1")]);Store([Reg("0");Reg("%3")]);Store([Reg("0.000000e+00");Reg("%4")]);Call([FnName("printf");Reg("%5")]);Call([FnName("__isoc99_scanf");Reg("%6");Reg("%3")]);Store([Reg("0");Reg("%2")]);Br([Reg("$7")]);Label([Reg("$7")]);Load([Reg("%8");Reg("%2")]);Load([Reg("%9");Reg("%3")]);Icmp([Reg("%10");Reg("%8");Reg("%9")]);Br([Reg("$10");Reg("$11");Reg("$20")]);Label([Reg("$11")]);Load([Reg("%12");Reg("%4")]);Fadd([Reg("%13");Reg("%12")]);Store([Reg("%13");Reg("%4")]);Load([Reg("%14");Reg("%4")]);Fpext([Reg("%15");Reg("%14")]);Call([FnName("printf");Reg("%16");Reg("%15")]);Br([Reg("$17")]);Label([Reg("$17")]);Load([Reg("%18");Reg("%2")]);Add([Reg("%19");Reg("%18")]);Store([Reg("%19");Reg("%2")]);Br([Reg("$7")]);Label([Reg("$20")]);Ret([])])
+(* let main = Function("i32", "main", [Alloca([Op("%1")]);Alloca([Op("%2")]);Alloca([Op("%3")]);Alloca([Op("%4")]);Store([Op("%1")]);Store([Op("%3")]);Store([Op("%4")]);Call([FnName("printf");Op("%5")]);Call([FnName("__isoc99_scanf");Op("%6");Op("%3")]);Store([Op("%2")]);Br([Op("$7")]);Label([Op("$7")]);Load([Op("%8");Op("%2")]);Load([Op("%9");Op("%3")]);Icmp([Op("%10");Op("%8");Op("%9")]);Br([Op("$10");Op("$11");Op("$20")]);Label([Op("$11")]);Load([Op("%12");Op("%4")]);Fadd([Op("%13");Op("%12")]);Store([Op("%13");Op("%4")]);Load([Op("%14");Op("%4")]);Fpext([Op("%15");Op("%14")]);Call([FnName("printf");Op("%16");Op("%15")]);Br([Op("$17")]);Label([Op("$17")]);Load([Op("%18");Op("%2")]);Add([Op("%19");Op("%18")]);Store([Op("%19");Op("%2")]);Br([Op("$7")]);Label([Op("$20")]);Ret([])]) *)
+let main = Function("i32", "main", [Alloca([Op("%1")]);Alloca([Op("%2")]);Alloca([Op("%3")]);Alloca([Op("%4")]);Store([Op("0");Op("%1")]);Store([Op("0");Op("%3")]);Store([Op("0.000000e+00");Op("%4")]);Call([FnName("printf");Op("%5")]);Call([FnName("__isoc99_scanf");Op("%6");Op("%3")]);Store([Op("0");Op("%2")]);Br([Op("$7")]);Label([Op("$7")]);Load([Op("%8");Op("%2")]);Load([Op("%9");Op("%3")]);Icmp([Op("%10");Op("%8");Op("%9")]);Br([Op("$10");Op("$11");Op("$20")]);Label([Op("$11")]);Load([Op("%12");Op("%4")]);Fadd([Op("%13");Op("%12")]);Store([Op("%13");Op("%4")]);Load([Op("%14");Op("%4")]);Fpext([Op("%15");Op("%14")]);Call([FnName("printf");Op("%16");Op("%15")]);Br([Op("$17")]);Label([Op("$17")]);Load([Op("%18");Op("%2")]);Add([Op("%19");Op("%18")]);Store([Op("%19");Op("%2")]);Br([Op("$7")]);Label([Op("$20")]);Ret([])])
 
 let init_fn_map = fun x -> if x == "main" then Some main else None
 
@@ -70,7 +70,7 @@ let rec scan_reg_upgradable regs reg fn_map =
     match regs with
                 | hdr::tailr -> (
                         match hdr with
-                        | Reg r -> Printf.printf "scan_reg_upgradable %s %s\n" r reg;if r=reg then false else scan_reg_upgradable tailr reg fn_map
+                        | Op r -> Printf.printf "scan_reg_upgradable %s %s\n" r reg;if r=reg then false else scan_reg_upgradable tailr reg fn_map
                         | other -> scan_reg_upgradable tailr reg fn_map
                         )
     		| [] -> true
@@ -91,21 +91,21 @@ let rec look_for_stores body reg label_block fn_map phi_lst =
         | Store params -> (
         				  let dst_reg = List.nth params 0 in
         				  match dst_reg with
-        				  | Reg r -> (
+        				  | Op r -> (
         				  	let reg_tbm = List.nth params 1 in
         				  	match reg_tbm with
-        				  	| Reg r2 -> if r2=reg then 
-        				    look_for_stores tail reg label_block fn_map phi_lst@[Reg(r)]@[Reg(label_block)] else look_for_stores tail reg label_block fn_map phi_lst
+        				  	| Op r2 -> if r2=reg then
+        				    look_for_stores tail reg label_block fn_map phi_lst@[Op(r)]@[Op(label_block)] else look_for_stores tail reg label_block fn_map phi_lst
         				    (*
         				  	Printf.printf "found store for reg %s with r %s in label block %s\n" reg r label_block;
         				  	[(r, label_block)]
-        				    	look_for_stores tail reg label_block fn_map phi_lst@[Reg(r)]@[Reg(label_block)] *)
+        				    	look_for_stores tail reg label_block fn_map phi_lst@[Op(r)]@[Op(label_block)] *)
         				)
         )
 	| Label params -> (
 			  let jmp_lbl_c = List.nth params 0 in
 			  match jmp_lbl_c with
-			  | Reg jmp_lbl -> look_for_stores tail reg jmp_lbl fn_map phi_lst
+			  | Op jmp_lbl -> look_for_stores tail reg jmp_lbl fn_map phi_lst
 			  | _ -> look_for_stores tail reg label_block fn_map phi_lst (* This can't happen *)
 			)
         | other -> look_for_stores tail reg label_block fn_map phi_lst
@@ -132,7 +132,7 @@ let rec enable_mem2reg obody body fn_map offset rm_map proc_map label_block =
 	| Alloca params -> (
 		let nly_reg_c = List.nth params 0 in
 		match nly_reg_c with 
-		| Reg nly_reg -> if is_upgradable tail nly_reg fn_map then (
+		| Op nly_reg -> if is_upgradable tail nly_reg fn_map then (
 				Nop::enable_mem2reg obody tail fn_map offset (update_rm rm_map nly_reg) proc_map label_block
 				(*Delete all store calls that reference to that reg and substitute load calls with phi*)
 				) else Alloca(params)::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
@@ -140,7 +140,7 @@ let rec enable_mem2reg obody body fn_map offset rm_map proc_map label_block =
 	| Load params -> (
 		let src_reg_c = List.nth params 1 in (* Loads have two params, 1 is the src reg *)
 		match src_reg_c with
-		| Reg src_reg -> (
+		| Op src_reg -> (
 			(* the register is one that needs processing and hasn't been processed yet *)
 			match rm_map src_reg, proc_map src_reg with
 			| Some reg, None -> (

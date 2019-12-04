@@ -24,11 +24,11 @@ def parse_instr_into_ast(line):
 
     if ":" in line:
         # label
-        return "label", [f"Reg(\"${line.split(':')[0]}\")"]
+        return "label", [f"Op(\"${line.split(':')[0]}\")"]
 
     if result is not None:
         dest, instr_body = result.groups()
-        registers.append(f"Reg(\"{dest}\")")
+        registers.append(f"Op(\"{dest}\")")
     else:
         instr_body = line
 
@@ -37,13 +37,13 @@ def parse_instr_into_ast(line):
     if func_name == "icmp":
         value = instr_body.split(" ")[-1]
         if "%" not in value:
-            registers.append(f"Reg(\"{value}\")")
+            registers.append(f"Op(\"{value}\")")
 
     if func_name == "store":
         value = instr_body.split(" ")[2]
         value = value[:-1]
         if "%" not in value:
-            registers.append(f"Reg(\"{value}\")")
+            registers.append(f"Op(\"{value}\")")
 
     if func_name == "call":
         callee = re.match(fn_call_regex, instr_body)
@@ -51,7 +51,7 @@ def parse_instr_into_ast(line):
         callee = callee.groups()[2]
         registers.append(f"FnName(\"{callee}\")")
 
-    registers.extend([f"Reg(\"{el}\")" for el in instr_registers])
+    registers.extend([f"Op(\"{el}\")" for el in instr_registers])
 
     return func_name, registers
 
@@ -136,10 +136,10 @@ if __name__ == "__main__":
         instr_consts += " of arg list | ".join(all_instr)
         instr_consts += " of arg list"
 
-    with open("out.ml", "w+") as ff:
+    with open(input_file[:-3] + ".ml", "w+") as ff:
 
         fn_map_init = "let init_fn_map = fun x -> if x == \"main\" then Some main else None"
         fn_map_update = "let update fn_map id fn = fun x -> if x == id then Some fn else fn_map id"
 
         ff.write(
-            f"""open List \ntype ident = string\n type arg = Reg of ident | FnName of ident \n{instr_consts}\ntype func_def = Function of ident * ident * (instr list)\n{fn_map_init}\n{fn_map_update}\n{func_consts}""")
+            f"""open List \ntype ident = string\n type arg = Op of ident | FnName of ident \n{instr_consts}\ntype func_def = Function of ident * ident * (instr list)\n{fn_map_init}\n{fn_map_update}\n{func_consts}""")

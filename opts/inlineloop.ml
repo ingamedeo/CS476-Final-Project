@@ -1,6 +1,6 @@
 open List 
 type ident = string
-type arg = Reg of ident | FnName of ident 
+type arg = Op of ident | FnName of ident
 type instr = Store of arg list 
 | Sitofp of arg list 
 | Call of arg list 
@@ -19,11 +19,11 @@ type instr = Store of arg list
 type func_def = Function of ident * ident * (instr list)
 
 let update fn_map id fn = fun x -> if x = id then Some fn else fn_map x
-let fun2 = Function("float*", "change_and_return", [Alloca([Reg("%2")]);Store([Reg("%0");Reg("%2")]);Call([FnName("rand");Reg("%3")]);Sitofp([Reg("%4");Reg("%3")]);Load([Reg("%5");Reg("%2")]);Store([Reg("%4");Reg("%5")]);Load([Reg("%6");Reg("%2")]);Ret([Reg("%6")])])
-let fun1 = Function("void", "change_value_to", [Alloca([Reg("%2")]);Store([Reg("%0");Reg("%2")]);Call([FnName("rand");Reg("%3")]);Sitofp([Reg("%4");Reg("%3")]);Load([Reg("%5");Reg("%2")]);Store([Reg("%4");Reg("%5")]);Ret([])])
-let main = Function("i32", "main", [Alloca([Reg("%1")]);Store([Reg("%1")]);Call([FnName("change_value_to");Reg("%1")]);Load([Reg("%2");Reg("%1")]);Fpext([Reg("%3");Reg("%2")]);Call([FnName("printf");Reg("%4");Reg("%3")]);Fpext([Reg("%3");Reg("%2")]); Fpext([Reg("%3");Reg("%2")]);Ret([])])
+let fun2 = Function("float*", "change_and_return", [Alloca([Op("%2")]);Store([Op("%0");Op("%2")]);Call([FnName("rand");Op("%3")]);Sitofp([Op("%4");Op("%3")]);Load([Op("%5");Op("%2")]);Store([Op("%4");Op("%5")]);Load([Op("%6");Op("%2")]);Ret([Op("%6")])])
+let fun1 = Function("void", "change_value_to", [Alloca([Op("%2")]);Store([Op("%0");Op("%2")]);Call([FnName("rand");Op("%3")]);Sitofp([Op("%4");Op("%3")]);Load([Op("%5");Op("%2")]);Store([Op("%4");Op("%5")]);Ret([])])
+let main = Function("i32", "main", [Alloca([Op("%1")]);Store([Op("%1")]);Call([FnName("change_value_to");Op("%1")]);Load([Op("%2");Op("%1")]);Fpext([Op("%3");Op("%2")]);Call([FnName("printf");Op("%4");Op("%3")]);Fpext([Op("%3");Op("%2")]); Fpext([Op("%3");Op("%2")]);Ret([])])
 
-let main_unroll = Function("dso_local i32", "main", [Alloca([Reg("%1")]);Alloca([Reg("%2")]);Alloca([Reg("%3")]);Store([Reg("%1")]);Store([Reg("%2")]);Store([Reg("%3")]);Br([Reg("$4")]);Label([Reg("$4")]);Load([Reg("%5");Reg("%3")]);Icmp([Reg("10");Reg("%6");Reg("%5")]);Br([Reg("$6");Reg("$7");Reg("$17")]);Label([Reg("$7")]);Load([Reg("%8");Reg("%3")]);Load([Reg("%9");Reg("%3")]);Mul([Reg("%10");Reg("%8");Reg("%9")]);Sitofp([Reg("%11");Reg("%10")]);Load([Reg("%12");Reg("%2")]);Fadd([Reg("%13");Reg("%12");Reg("%11")]);Store([Reg("%13");Reg("%2")]);Br([Reg("$14")]);Label([Reg("$14")]);Load([Reg("%15");Reg("%3")]);Add([Reg("%16");Reg("%15")]);Store([Reg("%16");Reg("%3")]);Br([Reg("$4")]);Label([Reg("$17")]);Load([Reg("%18");Reg("%2")]);Fpext([Reg("%19");Reg("%18")]);Call([FnName("printf");Reg("%20");Reg("%19")]);Ret([])])
+let main_unroll = Function("dso_local i32", "main", [Alloca([Op("%1")]);Alloca([Op("%2")]);Alloca([Op("%3")]);Store([Op("%1")]);Store([Op("%2")]);Store([Op("%3")]);Br([Op("$4")]);Label([Op("$4")]);Load([Op("%5");Op("%3")]);Icmp([Op("10");Op("%6");Op("%5")]);Br([Op("$6");Op("$7");Op("$17")]);Label([Op("$7")]);Load([Op("%8");Op("%3")]);Load([Op("%9");Op("%3")]);Mul([Op("%10");Op("%8");Op("%9")]);Sitofp([Op("%11");Op("%10")]);Load([Op("%12");Op("%2")]);Fadd([Op("%13");Op("%12");Op("%11")]);Store([Op("%13");Op("%2")]);Br([Op("$14")]);Label([Op("$14")]);Load([Op("%15");Op("%3")]);Add([Op("%16");Op("%15")]);Store([Op("%16");Op("%3")]);Br([Op("$4")]);Label([Op("$17")]);Load([Op("%18");Op("%2")]);Fpext([Op("%19");Op("%18")]);Call([FnName("printf");Op("%20");Op("%19")]);Ret([])])
 let init_fn_map = fun x -> if x = "main" then Some main else None
 let fn_map_tmp = update init_fn_map "change_value_to" fun1
 let fn_map = update fn_map_tmp "change_and_return" fun2
@@ -32,8 +32,8 @@ let rec offset_register reglist offset =
     match reglist with 
     | hd::tail -> (
         match hd with 
-        | Reg p -> (
-            if String.contains p '%' then  Reg ("%"^string_of_int(int_of_string (String.sub p 1 ((String.length p) - 1)) + offset))::offset_register tail offset else Reg (p)::offset_register tail offset 
+        | Op p -> (
+            if String.contains p '%' then  Op ("%"^string_of_int(int_of_string (String.sub p 1 ((String.length p) - 1)) + offset))::offset_register tail offset else Op (p)::offset_register tail offset
         )
         
         | _ -> hd::offset_register tail offset
@@ -44,7 +44,7 @@ let strip_until_ith str i = int_of_string (String.sub str i (String.length str -
 
 let rec has_useless_registers reg_list base = 
     match reg_list with 
-    | Reg(i)::t -> if strip_until_ith i 1 <= base then true else has_useless_registers t base
+    | Op(i)::t -> if strip_until_ith i 1 <= base then true else has_useless_registers t base
     | _ -> false 
 
 let offset_instruction instr offset base usefullness_check = 
@@ -63,7 +63,7 @@ let offset_instruction instr offset base usefullness_check =
     ) 
     | Ret i -> (
         let new_registers = offset_register i offset in 
-        if has_useless_registers new_registers base = true && usefullness_check = true || List.length new_registers = 0 then Nop else Load (new_registers@[Reg ("%"^string_of_int(offset))])
+        if has_useless_registers new_registers base = true && usefullness_check = true || List.length new_registers = 0 then Nop else Load (new_registers@[Op ("%"^string_of_int(offset))])
     ) 
     | Alloca i -> (
         let new_registers = offset_register i offset in 
@@ -120,7 +120,7 @@ let get_first_register_from_instruction instr =
         match i with 
         | b::rest -> (
             match b with 
-            | Reg addr -> strip_until_ith addr 1
+            | Op addr -> strip_until_ith addr 1
             | _ -> -999
             )
         | _ -> -999
@@ -162,7 +162,7 @@ let rec inline_declared_fn_calls body fn_map offset =
             let fname = List.hd params in 
             let return_reg = List.nth params 1 in 
             match fname, return_reg with 
-            | FnName name, Reg base -> (
+            | FnName name, Op base -> (
                 let new_body = inline_fn_body_new name (strip_until_ith base 1) offset in 
                 if snd new_body = [] then [offset_instruction (Call params) offset 0 false] @ inline_declared_fn_calls tail fn_map offset else snd new_body @ inline_declared_fn_calls tail fn_map (fst new_body)
             )
@@ -194,7 +194,7 @@ let rec find_register_pointing_to_label registers label: arg option =
     match registers with 
     | hd::tl -> (
         match hd with 
-        | Reg i -> if i = label then Some (Reg i) else find_register_pointing_to_label tl label
+        | Op i -> if i = label then Some (Op i) else find_register_pointing_to_label tl label
         | _ -> find_register_pointing_to_label tl label
     )
     | [] -> None
@@ -218,7 +218,7 @@ let rec find_first_label (body: instr list) (label_table: ident -> (instr list) 
         match hd with 
         | Label label-> (
             match List.hd label with 
-            | Reg label -> (
+            | Op label -> (
                 let instrs = find_until_branch_pointing_to_label label tl [] in
                     if instrs = [] then find_first_label tl label_table else find_first_label tl (update label_table label instrs)
             )
@@ -234,7 +234,7 @@ let rec find_unroll_factor instrs =
         match hd with 
         | Icmp args -> (
             match List.hd args with 
-            | Reg reg -> int_of_string reg
+            | Op reg -> int_of_string reg
             | FnName _ -> -999
         )
         | _ -> find_unroll_factor tl
@@ -261,7 +261,7 @@ let rec inject_at_branch_label whole_func to_inject label base =
         match hd with 
         | Br args -> (
             match List.hd args with 
-            | Reg reg -> if reg = label then to_inject@rename_registers tl ((List.length to_inject) * base)  0 else hd::inject_at_branch_label tl to_inject label base
+            | Op reg -> if reg = label then to_inject@rename_registers tl ((List.length to_inject) * base)  0 else hd::inject_at_branch_label tl to_inject label base
             | FnName n -> []
         )
         | _ -> hd::inject_at_branch_label tl to_inject label base

@@ -36,4 +36,6 @@ _opam/
 # llvm IR
 *.bc
 
+.idea
+
 # End of https://www.gitignore.io/api/ocaml

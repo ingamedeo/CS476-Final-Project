@@ -39,6 +39,12 @@ def parse_instr_into_ast(line):
         if "%" not in value:
             registers.append(f"Reg(\"{value}\")")
 
+    if func_name == "store":
+        value = instr_body.split(" ")[2]
+        value = value[:-1]
+        if "%" not in value:
+            registers.append(f"Reg(\"{value}\")")
+
     if func_name == "call":
         callee = re.match(fn_call_regex, instr_body)
         # print(callee.groups())
@@ -86,7 +92,7 @@ if __name__ == "__main__":
             instr_list = []
             for line in body:
 
-		#Skip IR annotations
+        #Skip IR annotations
                 if line.startswith('; '):
                     continue
 

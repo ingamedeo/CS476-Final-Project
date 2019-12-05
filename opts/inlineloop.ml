@@ -244,11 +244,14 @@ let rec find_unroll_factor instrs =
 let inlined = 
     match main with
     | Function (fn_type, name, body) -> (
-        (* first pass, it dumbly inlines the function call substituting all op calls that would have
-           resulted in an invalid register use to Nop
+        (* first pass, inlines the function calls into the main, offsets the registers in order to link
+         * the function parameters to the ones used in the function. Adds Nops in place of the stores that are now 
+         * useless due to the use of the same register, removes return from called function
          *)
         let pass1 = Function(fn_type, name, inline_declared_fn_calls body fn_map 0) in 
-        (* second pass, registers after the function call by the given offset *)
+        (* second pass, removes all the placeholder nops in the body and readds the return of the main
+         * if it was deleted by the first pass 
+         *)
         match pass1 with 
         | Function (_, _, new_body) -> Function (fn_type, name, add_conditional_return(remove_nops new_body))
     )

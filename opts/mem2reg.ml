@@ -147,20 +147,43 @@ let rec enable_mem2reg obody body fn_map offset rm_map proc_map label_block =
 				(* NOTE: look_for_stores should be able to look for stores in the FULL body (obody). Not only the body. *)
 				let store_list = look_for_stores obody reg label_block fn_map phi_lst in
 					Printf.printf "found prev. rm reg %s\n" reg;
-					Phi(store_list)::enable_mem2reg obody tail fn_map offset rm_map (update_proc proc_map reg) label_block
+					Phi(src_reg_c::store_list)::enable_mem2reg obody tail fn_map offset rm_map (update_proc proc_map reg) label_block
 					(* print_store_list store_list; Phi(store_list)::enable_mem2reg tail fn_map offset rm_map label_block *)
 			)
-			| _, _ -> Printf.printf "reg %s is still there\n" src_reg;Load(params)::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
+			| _, Some reg -> Printf.printf "found load already processed to phi node. removing..\n";Nop::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
+			| _, _ -> Printf.printf "Load with reg %s left in place\n" src_reg;Load(params)::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
 			)
+		)
+	(* Alloca() inst. MUST come before any related Load/Store() *)
+	| Store params -> (
+                let src_reg_c = List.nth params 1 in (* Loads have two params, 1 is the src reg *)
+                match src_reg_c with
+                | Op src_reg -> (
+                        (* the register is one that needs processing and hasn't been processed yet *)
+                        match rm_map src_reg, proc_map src_reg with
+                        | Some reg, _ -> (
+				Nop::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
+                        )
+                        | _, Some reg -> (
+                                Nop::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
+                        )
+                        | _, _ -> Printf.printf "Store with reg %s left in place\n" src_reg;Store(params)::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
+                        )
 		)
 	    | other -> other::enable_mem2reg obody tail fn_map offset rm_map proc_map label_block
 	)
+    | [] -> []
+
+let rec remove_nops body = 
+    match body with 
+    | Nop::rest -> remove_nops rest
+    | i::rest -> i::remove_nops rest
     | [] -> []
 
 (* LLVM mem2reg optimization entry point *)
 let ssa_enabled =
         match main with
         | Function (fn_type, name, body) -> (
-	   Function (fn_type, name, enable_mem2reg body body init_fn_map 0 empty_rm_map empty_proc_map "%0")
+	   Function (fn_type, name, remove_nops (enable_mem2reg body body init_fn_map 0 empty_rm_map empty_proc_map "%0"))
 )
 
